@@ -18,6 +18,7 @@
 
 import XCTest
 @testable import SmokeDynamoDB
+import SmokeHTTPClient
 
 private typealias DatabaseRowType =
     TypedDatabaseItem<StandardPrimaryKeyAttributes, RowWithItemVersion<TestTypeA>>
@@ -462,8 +463,13 @@ class DynamoDBHistoricalClientTests: XCTestCase {
         try table.insertItemSync(databaseItem)
         
         var isCompleted = false
-        func completionHandler(error: Error?) {
-            if error != nil {
+        func completionHandler(result: HTTPResult<DatabaseRowType>) {
+            switch result {
+            case .response(let result):
+                // the result returned is the updated item
+                XCTAssertEqual(2, result.rowStatus.rowVersion)
+                XCTAssertEqual(2, result.rowValue.itemVersion)
+            case .error:
                 XCTFail()
             }
             
@@ -524,8 +530,13 @@ class DynamoDBHistoricalClientTests: XCTestCase {
         try table.insertItemSync(databaseItem)
         
         var isCompleted = false
-        func completionHandler(error: Error?) {
-            if error != nil {
+        func completionHandler(result: HTTPResult<DatabaseRowType>) {
+            switch result {
+            case .response(let result):
+                // the result returned is the updated item
+                XCTAssertEqual(7, result.rowStatus.rowVersion)
+                XCTAssertEqual(2, result.rowValue.itemVersion)
+            case .error:
                 XCTFail()
             }
             
@@ -592,8 +603,8 @@ class DynamoDBHistoricalClientTests: XCTestCase {
         try table.conditionallyUpdateItemWithHistoricalRowAsync(
             forPrimaryKey: dKey,
             primaryItemProvider: conditionalUpdatePrimaryItemProvider,
-            historicalItemProvider: conditionalUpdateHistoricalItemProvider) { error in
-                guard let theError = error, case SmokeDynamoDBError.concurrencyError = theError else {
+            historicalItemProvider: conditionalUpdateHistoricalItemProvider) { result in
+                guard case let .error(theError) = result, case SmokeDynamoDBError.concurrencyError = theError else {
                     return XCTFail("Expected error not thrown")
                 }
                 
@@ -687,8 +698,8 @@ class DynamoDBHistoricalClientTests: XCTestCase {
         try table.conditionallyUpdateItemWithHistoricalRowAsync(
             forPrimaryKey: dKey,
             primaryItemProvider: primaryItemProvider,
-            historicalItemProvider: conditionalUpdateHistoricalItemProvider) { error in
-                guard let theError = error, case TestError.everythingIsWrong = theError else {
+            historicalItemProvider: conditionalUpdateHistoricalItemProvider) { result in
+                guard case let .error(theError) = result, case TestError.everythingIsWrong = theError else {
                     return XCTFail("Expected error not thrown")
                 }
                 
